@@ -36,19 +36,47 @@
 28. 对 Java 的异常体系的了解？
 29. 对解析与分派的了解？
 30. 静态代理和动态代理的区别？有什么场景使用？
+	https://www.cnblogs.com/gonjan-blog/p/6685611.html
 31. 谈谈对 Java 状态机理解？
+	https://www.cnblogs.com/pony1223/p/7518226.html
 
 ## 线程与并发
 
 1. 线程和进程的区别？
 2. 开启线程的三种方式
+   1) new Thread().start();
+   2) class MyRunnable immplement Runnable{}
+      new Thread(new MyRunnable).start();
+   3) hanlder.post(new Runnable() {});
+
 3. 如何正确的结束一个Thread?
+	设置结束标志位，再调用thread.interrupt();
+
 4. Thread 与 Runnable 的区别？
+	runnable只是一个接口而已，不会开启一个线程；而thread是一个线程，实现了Runnable接口，通过传入一个runnable实例可以在线程中启动。
+
 5. run() 与 start() 方法的区别？
+	start : 用start方法来启动线程，真正实现了多线程运行，这时无需等待run方法体代码执行完毕而直接继续执行下面的代码。通过调用Thread类的start()方法来启动一个线程，这时此线程处于就绪（可运行）状态，并没有运行，一旦得到cpu时间片，就开始执行run()方法，这里方法 run()称为线程体，它包含了要执行的这个线程的内容，Run方法运行结束，此线程随即终止。
+	run : run()方法只是类的一个普通方法而已，如果直接调用Run方法，程序中依然只有主线程这一个线程，其程序执行路径还是只有一条，还是要顺序执行，还是要等待run方法体执行完毕后才可继续执行下面的代码，这样就没有达到写线程的目的。
+
 6. sleep() 与 wait() 方法的区别？
+	1、这两个方法来自不同的类，sleep来自Thread类，wait 来自Object类。
+	2、最主要是sleep方法没有释放锁，而wait方法释放了锁，使其他线程可以使用同步控制块或者方法。sleep不出让系统资源；wait是进入线程等待池等待，出让系统资源，其他线程可以占用CPU。
+	3、使用范围：wait，notify和notifyAll只能在同步控制方法或者同步控制块里面使用，而sleep可以在任何地方使用
+	4、sleep必须捕获异常，而wait，notify和notifyAll不需要捕获异常。
+
 7. wait 与 notify 关键字的区别？
+
 8. synchronized 关键字的用法、作用及实现原理？
+	synchronized关键字最主要有以下3种应用方式
+	修饰实例方法,对当前实例加锁，进入同步代码前要获得当前实例的锁
+	修饰静态方法,对当前类对象(当前类的Class对象)加锁，进入同步代码前要获得当前类对象的锁
+	修饰代码块,对代码块{}中的内容加锁，进入同步代码块前要获得给定对象的锁。
+
+
+
 9. volatile 关键字的用法、作用及实现原理？
+	
 10. transient 关键字的用法、作用及实现原理？
 11. ReentrantLock、synchronized、volatile 之间的区别？
 12. 什么是线程池，如何使用?
