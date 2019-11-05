@@ -9,13 +9,45 @@
 1. [什么是面向对象（OOP）？](https://github.com/jeanboydev/Android-Interview/blob/master/Java.md#java_1)
 2. [什么是多态？实现多态的机制是什么？](https://github.com/jeanboydev/Android-Interview/blob/master/Java.md#java_2)
 3. [接口（Interface）与抽象类（Abstract Class）的区别？](https://github.com/jeanboydev/Android-Interview/blob/master/Java.md#java_3)
-4. [重写（Override）与重载（Overload）的区别?](https://github.com/jeanboydev/Android-Interview/blob/master/Java.md#java_4)
+4. [重写（Override）与重载（Overload）的区别?]  
+重写是子类对父类的允许访问的方法的实现过程进行重新编写, 返回值和形参都不能改变。即外壳不变，核心重写！  
+重写的好处在于子类可以根据需要，定义特定于自己的行为。 也就是说子类能够根据需要实现父类的方法。  
+
+重载(overloading) 是在一个类里面，方法名字相同，而参数不同。返回类型可以相同也可以不同。   
+每个重载的方法（或者构造函数）都必须有一个独一无二的参数类型列表。  
+只能重载构造函数  
+
 5. 父类的静态方法能否被子类重写？
-6. 静态属性和静态方法是否可以被继承？是否可以被重写？为什么？
+不能，无法使用@Override关键字，编译会报错。
+但是子类可以重新定义父类的静态方法，并将父类的静态方法屏蔽掉。
+   
+[6. 静态属性和静态方法是否可以被继承？是否可以被重写？为什么？](https://www.cnblogs.com/mxmbk/articles/5151095.html)
+可以被继承，但是不能被重写。
+在一个类中，相同姓名的属性，子类的属性隐藏父类的同名属性，即使它们的类型不同。在子类中，不能通过简单的名称来引用父类的属性。属性必须通过父类类来访问。一般而言，我们不推荐使用属性隐藏，因为这样的代码不易阅读。
+
+java中静态属性和静态方法可以被继承，但是没有被重写(overwrite)而是被隐藏.  
+1). 静态方法和属性是属于类的，调用的时候直接通过类名.方法名完成对，不需要继承机制即可以调用。
+2). 静态属性、静态方法和非静态的属性都可以被继承和隐藏而不能被重写，因此不能实现多态，不能实现父类的引用可以指向不同子类的对象。
+3). 如果在子类重写静态方法加上@Override会直接编译报错,不加@Override重写,用谁的对象/类调用就执行方法,静态方法时属于类的;静态属性同上
+
 7. 什么是内部类？内部类、静态内部类、局部内部类和匿名内部类的区别及作用？
-8. == 和 equals() 和 hashCode() 的区别？
+8. [== 和 equals() 和 hashCode() 的区别？](https://blog.csdn.net/zai_xia/article/details/81806446)
+1.Java对于equals()方法和hashCode()方法的规定
+如果两个对象equals()方法相等则它们的hashCode返回值一定要相同，如果两个对象的hashCode返回值相同，但它们的equals()方法不一定相等。
+两个对象的hashCode()返回值相等不能判断这两个对象是相等的，但两个对象的hashcode()返回值不相等则可以判定两个对象一定不相等。
+2.hashCode()返回值和 == 的关系
+若 == 返回true，则两边的对象的hashCode()返回值必须相等，若 == 返回false，则两边对象的hashCode()返回值可能相等，也可能不等，因为Java中对象默认的equals()方法就是用==实现的。而Java对于equals方法和hashCode方法的规定是如果两个对象equals()方法相等，则hashCode值一定会相同，如果两个对象的hashCode值相同，则它们的equals()方法不一定相等。
+
 9. Integer 和 int 之间的区别？
+
 10. String 转换成 Integer 的方式及原理？
+integer.parseInt(string str)方法调用Integer内部的 
+parseInt(string str,10)方法,默认基数为10，parseInt内部首先 
+判断字符串是否包含符号（-或者+），则对相应的negative和limit进行 
+赋值，然后再循环字符串，对单个char进行数值计算Character.digit(char ch, int radix) 
+在这个方法中，函数肯定进入到0-9字符的判断（相对于string转换到int）， 
+否则会抛出异常，数字就是如上面进行拼接然后生成的int类型数值
+
 11. 自动装箱实现原理？类型转换实现原理？
 12. 对 String 的了解？
 13. String 为什么要设计成不可变的？
