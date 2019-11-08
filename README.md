@@ -36,45 +36,84 @@ java中静态属性和静态方法可以被继承，但是没有被重写(overwr
 如果两个对象equals()方法相等则它们的hashCode返回值一定要相同，如果两个对象的hashCode返回值相同，但它们的equals()方法不一定相等。
 两个对象的hashCode()返回值相等不能判断这两个对象是相等的，但两个对象的hashcode()返回值不相等则可以判定两个对象一定不相等。
 2.hashCode()返回值和 == 的关系
-若 == 返回true，则两边的对象的hashCode()返回值必须相等，若 == 返回false，则两边对象的hashCode()返回值可能相等，也可能不等，因为Java中对象默认的equals()方法就是用==实现的。而Java对于equals方法和hashCode方法的规定是如果两个对象equals()方法相等，则hashCode值一定会相同，如果两个对象的hashCode值相同，则它们的equals()方法不一定相等。
-
-9. Integer 和 int 之间的区别？
-
+若 == 返回true，则两边的对象的hashCode()返回值必须相等，若 == 返回false，则两边对象的hashCode()返回值可能相等，也可能不等，因为Java中对象默认的equals()方法就是用==实现的。而Java对于equals方法和hashCode方法的规定是如果两个对象equals()方法相等，则hashCode值一定会相同，如果两个对象的hashCode值相同，则它们的equals()方法不一定相等。  
+   
+9. Integer 和 int 之间的区别？  
+  1、Integer是int的包装类，int则是java的一种基本数据类型   
+  2、Integer变量必须实例化后才能使用，而int变量不需要   
+  3、Integer实际是对象的引用，当new一个Integer时，实际上是生成一个指针指向此对象；而int则是直接存储数据值   
+  4、Integer的默认值是null，int的默认值是0. 
+     
 10. String 转换成 Integer 的方式及原理？
 integer.parseInt(string str)方法调用Integer内部的 
 parseInt(string str,10)方法,默认基数为10，parseInt内部首先 
 判断字符串是否包含符号（-或者+），则对相应的negative和limit进行 
 赋值，然后再循环字符串，对单个char进行数值计算Character.digit(char ch, int radix) 
 在这个方法中，函数肯定进入到0-9字符的判断（相对于string转换到int）， 
-否则会抛出异常，数字就是如上面进行拼接然后生成的int类型数值
-
+否则会抛出异常，数字就是如上面进行拼接然后生成的int类型数值  
+   
 11. 自动装箱实现原理？类型转换实现原理？
+自动装箱时编译器调用valueOf将原始类型值转换成对象，同时自动拆箱时，编译器通过调用类似intValue(),
+doubleValue()这类的方法将对象转换成原始类型值。  
+
 12. 对 String 的了解？
+
+
 13. String 为什么要设计成不可变的？
+String是不可变类有以下几个优点
+由于String是不可变类，所以在多线程中使用是安全的，我们不需要做任何其他同步操作。
+String是不可变的，它的值也不能被改变，所以用来存储数据密码很安全。
+因为java字符串是不可变的，可以在java运行时节省大量java堆空间。因为不同的字符串变量可以引用池中的相同的字符串。如果字符串是可变得话，任何一个变量的值改变，就会反射到其他变量，那字符串池也就没有任何意义了。
+
+浅谈一下String, StringBuffer，StringBuilder的区别？
+
+String是不可变类，每当我们对String进行操作的时候，总是会创建新的字符串。操作String很耗资源,所以Java提供了两个工具类来操作String - StringBuffer和StringBuilder。
+
+StringBuffer和StringBuilder是可变类，StringBuffer是线程安全的，StringBuilder则不是线程安全的。所以在多线程对同一个字符串操作的时候，我们应该选择用StringBuffer。由于不需要处理多线程的情况，StringBuilder的效率比StringBuffer高。
+
 14. [final、finally 和 finalize 的区别？](https://github.com/jeanboydev/Android-Interview/blob/master/Java.md#java_14)
 15. [static 关键字有什么作用？](https://github.com/jeanboydev/Android-Interview/blob/master/Java.md#java_15)
 16. 列举 Java 的集合以及集合之间的继承关系?
+Collection {
+  List {
+    ArrayList,LinkedList,Vector,Stack
+  }  
+  Set {
+    HashSet,TreeSet,LinkedHashSet
+  }   
+}  
+Map {
+  HashMap, LinkedHashMap,ConcurrentHashMap,HashTable,TreeMap
+}  
+    
 17. List、Set、Map 的区别？
+https://images.gitbook.cn/6e7001c0-3be3-11e9-af57-196eefd310b5
 18. [ArrayList、LinkedList 的区别？](https://github.com/jeanboydev/Android-Interview/blob/master/Java.md#java_18)
 19. HashMap，HashTable，ConcurrentHashMap 实现原理以及区别？
 20. HashSet 与 HashMap 怎么判断集合元素重复？
 21. String、StringBuffer、StringBuilder 之间的区别？
 22. [什么是序列化？怎么实现？有哪些方式？](https://github.com/jeanboydev/Android-Interview/blob/master/Java.md#java_22)
 23. 对反射的了解？
+JAVA反射机制是在运行状态中，对于任意一个类，都能够知道这个类的所有属性和方法；对于任意一个对象，都能够调用它的任意方法和属性；这种动态获取信息以及动态调用对象方法的功能称为java语言的反射机制。
 24. 对注解的了解？
 25. 对依赖注入的了解？
 26. 对泛型的了解？
 27. 泛型中 extends 和 super 的区别？
 28. 对 Java 的异常体系的了解？
 29. 对解析与分派的了解？
-30. 静态代理和动态代理的区别？有什么场景使用？
-	https://www.cnblogs.com/gonjan-blog/p/6685611.html
-31. 谈谈对 Java 状态机理解？
-	https://www.cnblogs.com/pony1223/p/7518226.html
-
+30. [静态代理和动态代理的区别？有什么场景使用？](https://www.cnblogs.com/gonjan-blog/p/6685611.html)
+代理模式是常用的java设计模式，他的特征是代理类与委托类有同样的接口，代理类主要负责为委托类预处理消息、过滤消息、把消息转发给委托类，以及事后处理消息等。  
+动态代理的优势在于可以很方便的对代理类的函数进行统一的处理，而不用修改每个代理类中的方法。是因为所有被代理执行的方法，都是通过在InvocationHandler中的invoke方法调用的，所以我们只要在invoke方法中统一处理，就可以对所有被代理的方法进行相同的操作了。
+   
+31. [谈谈对 Java 状态机理解?](https://www.cnblogs.com/pony1223/p/7518226.html)
+  
 ## 线程与并发
   
 1. 线程和进程的区别？
+  1，进程是资源管理的最小单位，线程是程序执行的最小单位
+  2，线程比进程花费更小的CPU资源
+  3，线程和进程的关系是 线程属于进程，线程运行在进程空间内
+   
 2. 开启线程的三种方式  
    1) new Thread().start();  
    2) class MyRunnable immplement Runnable{}  
@@ -98,12 +137,19 @@ parseInt(string str,10)方法,默认基数为10，parseInt内部首先
 	4、sleep必须捕获异常，而wait，notify和notifyAll不需要捕获异常。   
    
 7. wait 与 notify 关键字的区别？    
-   
+   wait会让线程进入等待状态，释放cpu；notify调用后，获取到对象状态锁的代码库会继续执行wait后的代码。
+      
 8. synchronized 关键字的用法、作用及实现原理？   
 	synchronized关键字最主要有以下3种应用方式   
 	修饰实例方法,对当前实例加锁，进入同步代码前要获得当前实例的锁   
 	修饰静态方法,对当前类对象(当前类的Class对象)加锁，进入同步代码前要获得当前类对象的锁    
 	修饰代码块,对代码块{}中的内容加锁，进入同步代码块前要获得给定对象的锁。   
+	
+	Synchronized 的主要作用：
+	1.确保线程互斥的访问同步代码。
+	2.保证共享变量的修改能够及时可见。
+	3.有效解决重拍排序问题.
+   
    
 9. volatile 关键字的用法、作用及实现原理？   
 	作用：用于保持内存可见性和防止指令重排序，    
@@ -141,6 +187,51 @@ parseInt(string str,10)方法,默认基数为10，parseInt内部首先
 	7.      对象空间重分配阶段(De-allocated)   
 
 16. [对并发编程的了解?](https://www.jianshu.com/p/01188fa8e511)   
+
+17.线程同步
+CyclicBarrier、CountDownLatch和Semaphore
+  
+##网络
+1.三次握手
+第一次握手：建立连接时，客户端发送syn包（syn=j）到服务器，并进入SYN_SENT状态，等待服务器确认；SYN：同步序列编号（Synchronize Sequence Numbers）。
+第二次握手：服务器收到syn包，必须确认客户的SYN（ack=j+1），同时自己也发送一个SYN包（syn=k），即SYN+ACK包，此时服务器进入SYN_RECV状态；
+第三次握手：客户端收到服务器的SYN+ACK包，向服务器发送确认包ACK(ack=k+1），此包发送完毕，客户端和服务器进入ESTABLISHED（TCP连接成功）状态，完成三次握手。
+   
+2.四次挥手
+由于TCP连接是全双工的，因此每个方向都必须单独进行关闭。
+
+客户端A发送一个FIN，用来关闭客户A到服务器B的数据传送（报文段4）。
+服务器B收到这个FIN，它发回一个ACK，确认序号为收到的序号加1（报文段5）。和SYN一样，一个FIN将占用一个序号。
+服务器B关闭与客户端A的连接，发送一个FIN给客户端A（报文段6）。
+客户端A发回ACK报文确认，并将确认序号设置为收到序号加1（报文段7）
+  
+3.Http的状态码含义。
+1** 信息，服务器收到请求，需要请求者继续执行操作
+2** 成功，操作被成功接收并处理
+3** 重定向，需要进一步的操作以完成请求
+301 Moved Permanently。请求的资源已被永久的移动到新URI，返回信息会包括新的URI，浏览器会自动定向到新URI。今后任何新的请求都应使用新的URI代替
+302 Moved Temporarily。与301类似。但资源只是临时被移动。客户端应继续使用原有URI
+304 Not Modified。所请求的资源未修改，服务器返回此状态码时，不会返回任何资源。客户端通常会缓存访问过的资源，通过提供一个头信息指出客户端希望只返回在指定日期之后修改的资源。
+4** 客户端错误，请求包含语法错误或无法完成请求
+400 Bad Request 由于客户端请求有语法错误，不能被服务器所理解。
+401 Unauthorized 请求未经授权。这个状态代码必须和WWW-Authenticate报头域一起使用
+403 Forbidden 服务器收到请求，但是拒绝提供服务。服务器通常会在响应正文中给出不提供服务的原因
+404 Not Found 请求的资源不存在，例如，输入了错误的URL
+5** 服务器错误，服务器在处理请求的过程中发生了错误
+500 Internal Server Error 服务器发生不可预期的错误，导致无法完成客户端的请求。
+503 Service Unavailable 服务器当前不能够处理客户端的请求，在一段时间之后，服务器可能会恢复正常
+   
+4.Http request的几种类型。
+GET 请求指定的页面信息，并返回实体主体。
+POST 向指定资源提交数据进行处理请求（例如提交表单或者上传文件）。数据被包含在请求体中。POST请求可能会导致新的资源的建立和/或已有资源的修改。
+PUT 从客户端向服务器传送的数据取代指定的文档的内容。
+DELETE 请求服务器删除指定的页面。 
+   
+5.DELETE 请求服务器删除指定的页面。.Http会话的过程？
+建立tcp连接
+发出请求文档
+发出响应文档
+释放tcp连接
    
 ## JVM
  
