@@ -151,10 +151,197 @@ JAVA反射机制是在运行状态中，对于任意一个类，都能够知道�
 	3.有效解决重拍排序问题.
    
    
-9. volatile 关键字的用法、作用及实现原理？   
-	作用：用于保持内存可见性和防止指令重排序，    
-	可见性实现：（1）修改volatile变量时会强制将修改后的值刷新的主内存中。 （2）修改volatile变量后会导致其他线程工作内存中对应的变量值失效。因此，再读取该变量值的时候就需要重新从读取主内存中的值。  
-	重排序：使用volatile的变量在读和写的时候，会在读和写操作的前后加入内存屏障，防止指令重排序。    
+9. (volatile 关键字的用法、作用及实现原理?)[https://www.bookstack.cn/read/interview/java-volatile.md]
+	计算机内存模型
+
+计算机在执行程序时，每条指令都是在CPU中执行的，而执行指令过程中，势必涉及到数据的读取和写入。由于程序运行过程中的临时数据是存放在主存（物理内存）当中的，这时就存在一个问题，由于CPU执行速度很快，而从内存读取数据和向内存写入数据的过程跟CPU执行指令的速度比起来要慢的多，因此如果任何时候对数据的操作都要通过和内存的交互来进行，会大大降低指令执行的速度。因此在CPU里面就有了高速缓存。当程序在运行过程中，会将运算需要的数据从主存复制一份到CPU的高速缓存当中，那么CPU进行计算时就可以直接从它的高速缓存读取数据和向其中写入数据，当运算结束之后，再将高速缓存中的数据刷新到主存当中。举个简单的例子，比如下面的这段代码：
+
+i = i + 1;
+当线程执行这个语句时，会先从主存当中读取i的值，然后复制一份到高速缓存当中，然后 CPU 执行指令对i进行加1操作，然后将数据写入高速缓存，最后将高速缓存中i最新的值刷新到主存当中。
+这个代码在单线程中运行是没有任何问题的，但是在多线程中运行就会有问题了。在多核 CPU 中，每条线程可能运行于不同的 CPU 中，因此 每个线程运行时有自己的高速缓存（对单核CPU来说，其实也会出现这种问题，只不过是以线程调度的形式来分别执行的）。比如同时有两个线程执行这段代码，假如初始时i的值为0，那么我们希望两个线程执行完之后i的值变为2。但是事实会是这样吗？
+
+可能出现这种情况：初始时，两个线程分别读取i的值存入各自所在的 CPU 的高速缓存当中，然后 线程1 进行加1操作，然后把i的最新值1写入到内存。此时线程2的高速缓存当中i的值还是0，进行加1操作之后，i的值为1，然后线程2把i的值写入内存。最终结果i的值是1，而不是2。这就是著名的缓存一致性问题。通常称这种被多个线程访问的变量为共享变量。
+
+为了解决缓存不一致性问题，通常来说有以下两种解决方法：
+
+通过在总线加LOCK#锁的方式
+通过 缓存一致性协议
+这两种方式都是硬件层面上提供的方式。
+在早期的 CPU 当中，是通过在总线上加LOCK#锁的形式来解决缓存不一致的问题。因为 CPU 和其他部件进行通信都是通过总线来进行的，如果对总线加LOCK#锁的话，也就是说阻塞了其他 CPU 对其他部件访问（如内存），从而使得只能有一个 CPU 能使用这个变量的内存。比如上面例子中 如果一个线程在执行 i = i +1，如果在执行这段代码的过程中，在总线上发出了LCOK#锁的信号，那么只有等待这段代码完全执行完毕之后，其他CPU才能从变量i所在的内存读取变量，然后进行相应的操作。这样就解决了缓存不一致的问题。但是上面的方式会有一个问题，由于在锁住总线期间，其他CPU无法访问内存，导致效率低下。
+
+所以就出现了缓存一致性协议。最出名的就是 Intel 的MESI协议，MESI协议保证了每个缓存中使用的共享变量的副本是一致的。它核心的思想是：当CPU写数据时，如果发现操作的变量是共享变量，即在其他CPU中也存在该变量的副本，会发出信号通知其他CPU将该变量的缓存行置为无效状态，因此当其他CPU需要读取这个变量时，发现自己缓存中缓存该变量的缓存行是无效的，那么它就会从内存重新读取。
+
+Volatile原理 - 图1
+
+　Java内存模型
+
+在Java虚拟机规范中试图定义一种Java内存模型（Java Memory Model，JMM）来屏蔽各个硬件平台和操作系统的内存访问差异，以实现让Java程序在各种平台下都能达到一致的内存访问效果。那么Java内存模型规定了程序中变量的访问规则，往大一点说是定义了程序执行的次序。注意，为了获得较好的执行性能，Java内存模型并没有限制执行引擎使用处理器的寄存器或者高速缓存来提升指令执行速度，也没有限制编译器对指令进行重排序。也就是说，在java内存模型中，也会存在缓存一致性问题和指令重排序的问题。
+
+Java内存模型规定所有的变量都是存在主存当中（类似于前面说的物理内存），每个线程都有自己的工作内存（类似于前面的高速缓存）。线程对变量的所有操作都必须在工作内存中进行，而不能直接对主存进行操作。并且每个线程不能访问其他线程的工作内存。
+
+在Java中，执行下面这个语句：
+
+i  = 10;
+执行线程必须先在自己的工作线程中对变量i所在的缓存行进行赋值操作，然后再写入主存当中。而不是直接将数值10写入主存当中。那么Java语言本身对 原子性、可见性以及有序性提供了哪些保证呢？
+
+原子性
+
+即一个操作或者多个操作 要么全部执行并且执行的过程不会被任何因素打断，要么就都不执行。
+在Java中，对基本数据类型的变量的读取和赋值操作是原子性操作，即这些操作是不可被中断的，要么执行，要么不执行。上面一句话虽然看起来简单，但是理解起来并不是那么容易。看下面一个例子i：请分析以下哪些操作是原子性操作：
+
+x = 10;        //语句1
+y = x;         //语句2
+x++;           //语句3
+x = x + 1;     //语句4
+咋一看，有些朋友可能会说上面的4个语句中的操作都是原子性操作。其实只有语句1是原子性操作，其他三个语句都不是原子性操作。
+
+语句1是直接将数值10赋值给x，也就是说线程执行这个语句的会直接将数值10写入到工作内存中。
+语句2实际上包含2个操作，它先要去读取x的值，再将x的值写入工作内存，虽然读取x的值以及 将x的值写入工作内存 这2个操作都是原子性操作，但是合起来就不是原子性操作了。
+同样的，x++和 x = x+1包括3个操作：读取x的值，进行加1操作，写入新的值。
+也就是说，只有简单的读取、赋值（而且必须是将数字赋值给某个变量，变量之间的相互赋值不是原子操作）才是原子操作。不过这里有一点需要注意：在32位平台下，对64位数据的读取和赋值是需要通过两个操作来完成的，不能保证其原子性。但是好像在最新的JDK中，JVM已经保证对64位数据的读取和赋值也是原子性操作了。
+
+从上面可以看出，Java内存模型只保证了基本读取和赋值是原子性操作，如果要实现更大范围操作的原子性，可以通过synchronized和Lock来实现。由于synchronized和Lock能够保证任一时刻只有一个线程执行该代码块，那么自然就不存在原子性问题了，从而保证了原子性。
+
+可见性
+
+可见性是指当多个线程访问同一个变量时，一个线程修改了这个变量的值，其他线程能够立即看得到修改的值。
+对于可见性，Java提供了volatile关键字来保证可见性。当一个共享变量被volatile修饰时，它会保证修改的值会立即被更新到主存，当有其他线程需要读取时，它会去内存中读取新值。而普通的共享变量不能保证可见性，因为普通共享变量被修改之后，什么时候被写入主存是不确定的，当其他线程去读取时，此时内存中可能还是原来的旧值，因此无法保证可见性。
+
+另外，通过synchronized和Lock也能够保证可见性，synchronized和Lock能保证同一时刻只有一个线程获取锁然后执行同步代码，并且在释放锁之前会将对变量的修改刷新到主存当中。因此可以保证可见性。
+
+有序性
+
+即程序执行的顺序按照代码的先后顺序执行。
+
+指令重排序，一般来说，处理器为了提高程序运行效率，可能会对输入代码进行优化，它不保证程序中各个语句的执行先后顺序同代码中的顺序一致，但是它会保证程序最终执行结果和代码顺序执行的结果是一致的。
+处理器在进行重排序时是会考虑指令之间的数据依赖性，如果一个指令Instruction 2必须用到Instruction 1的结果，那么处理器会保证Instruction 1会在Instruction 2之前执行。
+
+在Java内存模型中，允许编译器和处理器对指令进行重排序，但是重排序过程不会影响到单线程程序的执行，却会影响到多线程并发执行的正确性。
+
+在Java里面，可以通过volatile关键字来保证一定的“有序性”（具体原理在下一节讲述）。另外可以通过synchronized和Lock来保证有序性，很显然，synchronized和Lock保证每个时刻是有一个线程执行同步代码，相当于是让线程顺序执行同步代码，自然就保证了有序性。
+
+另外，Java内存模型具备一些先天的“有序性”，即不需要通过任何手段就能够得到保证的有序性，这个通常也称为 happens-before 原则。如果两个操作的执行次序无法从happens-before原则推导出来，那么它们就不能保证它们的有序性，虚拟机可以随意地对它们进行重排序。
+
+下面就来具体介绍下happens-before原则（先行发生原则）：
+
+程序次序规则：一个线程内，按照代码顺序，书写在前面的操作先行发生于书写在后面的操作
+锁定规则：一个unLock操作先行发生于后面对同一个锁额lock操作
+volatile变量规则：对一个变量的写操作先行发生于后面对这个变量的读操作
+传递规则：如果操作A先行发生于操作B，而操作B又先行发生于操作C，则可以得出操作A先行发生于操作C
+线程启动规则：Thread对象的start()方法先行发生于此线程的每个一个动作
+线程中断规则：对线程interrupt()方法的调用先行发生于被中断线程的代码检测到中断事件的发生
+线程终结规则：线程中所有的操作都先行发生于线程的终止检测，我们可以通过Thread.join()方法结束、Thread.isAlive()的返回值手段检测到线程已经终止执行
+对象终结规则：一个对象的初始化完成先行发生于他的finalize()方法的开始
+对于程序次序规则来说，我的理解就是一段程序代码的执行在单个线程中看起来是有序的。注意，虽然这条规则中提到“书写在前面的操作先行发生于书写在后面的操作”，这个应该是程序看起来执行的顺序是按照代码顺序执行的，因为虚拟机可能会对程序代码进行指令重排序。虽然进行重排序，但是最终执行的结果是与程序顺序执行的结果一致的，它只会对不存在数据依赖性的指令进行重排序。因此，在单个线程中，程序执行看起来是有序执行的，这一点要注意理解。事实上，这个规则是用来保证程序在单线程中执行结果的正确性，但无法保证程序在多线程中执行的正确性。
+
+第二条规则也比较容易理解，也就是说无论在单线程中还是多线程中，同一个锁如果出于被锁定的状态，那么必须先对锁进行了释放操作，后面才能继续进行lock操作。
+
+第三条规则是一条比较重要的规则，也是后文将要重点讲述的内容。直观地解释就是，如果一个线程先去写一个变量，然后一个线程去进行读取，那么写入操作肯定会先行发生于读操作。
+
+第四条规则实际上就是体现happens-before原则具备传递性。
+
+深入剖析Volatile关键字
+
+Volatile的语义
+
+一旦一个共享变量（类的成员变量、类的静态成员变量）被volatile修饰之后，那么就具备了两层语义：
+
+保证了不同线程对这个变量进行操作时的可见性，即一个线程修改了某个变量的值，这新值对其他线程来说是立即可见的。
+　- 禁止进行指令重排序。
+先看一段代码，假如线程1先执行，线程2后执行：
+
+//线程1
+boolean stop = false;
+while(!stop){
+    doSomething();
+}
+//线程2
+stop = true;
+这段代码是很典型的一段代码，很多人在中断线程时可能都会采用这种标记办法。但是事实上，这段代码会完全运行正确么？即一定会将线程中断么？不一定，也许在大多数时候，这个代码能够把线程中断，但是也有可能会导致无法中断线程（虽然这个可能性很小，但是只要一旦发生这种情况就会造成死循环了）。
+
+下面解释一下这段代码为何有可能导致无法中断线程。在前面已经解释过，每个线程在运行过程中都有自己的工作内存，那么线程1在运行的时候，会将stop变量的值拷贝一份放在自己的工作内存当中。
+
+那么当线程2更改了stop变量的值之后，但是还没来得及写入主存当中，线程2转去做其他事情了，那么线程1由于不知道线程2对stop变量的更改，因此还会一直循环下去。但是用volatile修饰之后就变得不一样了：
+
+　- 使用volatile关键字会强制将修改的值立即写入主存；
+
+使用volatile关键字的话，当线程2进行修改时，会导致线程1的工作内存中缓存变量stop的缓存行无效（反映到硬件层的话，就是CPU的L1或者L2缓存中对应的缓存行无效）；
+由于线程1的工作内存中缓存变量stop的缓存行无效，所以线程1再次读取变量stop的值时会去主存读取。
+那么在线程2修改stop值时（当然这里包括2个操作，修改线程2工作内存中的值，然后将修改后的值写入内存），会使得线程1的工作内存中缓存变量stop的缓存行无效，然后线程1读取时，发现自己的缓存行无效，它会等待缓存行对应的主存地址被更新之后，然后去对应的主存读取最新的值。
+那么线程1读取到的就是最新的正确的值。
+
+Volatile与原子性
+
+从上面知道volatile关键字保证了操作的可见性，但是volatile能保证对变量的操作是原子性吗？
+
+下面看一个例子：
+
+public class Test {
+    public volatile int inc = 0;
+    public void increase() {
+        inc++;
+    }
+    public static void main(String[] args) {
+        final Test test = new Test();
+        for(int i=0;i<10;i++){
+            new Thread(){
+                public void run() {
+                    for(int j=0;j<1000;j++)
+                        test.increase();
+                };
+            }.start();
+        }
+        while(Thread.activeCount()>1)  //保证前面的线程都执行完
+            Thread.yield();
+        System.out.println(test.inc);
+    }
+}
+大家想一下这段程序的输出结果是多少？也许有些朋友认为是10000。但是事实上运行它会发现每次运行结果都不一致，都是一个小于10000的数字。可能有的朋友就会有疑问，不对啊，上面是对变量inc进行自增操作，由于volatile保证了可见性，那么在每个线程中对inc自增完之后，在其他线程中都能看到修改后的值啊，所以有10个线程分别进行了1000次操作，那么最终inc的值应该是1000*10=10000。
+
+这里面就有一个误区了，volatile关键字能保证可见性没有错，但是上面的程序错在没能保证原子性。可见性只能保证每次读取的是最新的值，但是volatile没办法保证对变量的操作的原子性。
+
+在前面已经提到过，自增操作是不具备原子性的，它包括读取变量的原始值、进行加1操作、写入工作内存。那么就是说自增操作的三个子操作可能会分割开执行，就有可能导致下面这种情况出现：
+
+假如某个时刻变量inc的值为10，
+线程1对变量进行自增操作，线程1先读取了变量inc的原始值，然后线程1被阻塞了；
+然后线程2对变量进行自增操作，线程2也去读取变量inc的原始值，由于线程1只是对变量inc进行读取操作，而没有对变量进行修改操作，所以不会导致线程2的工作内存中缓存变量inc的缓存行无效，所以线程2会直接去主存读取inc的值，发现inc的值时10，然后进行加1操作，并把11写入工作内存，最后写入主存。
+然后线程1接着进行加1操作，由于已经读取了inc的值，注意此时在线程1的工作内存中inc的值仍然为10，所以线程1对inc进行加1操作后inc的值为11，然后将11写入工作内存，最后写入主存。
+那么两个线程分别进行了一次自增操作后，inc只增加了1。
+解释到这里，可能有朋友会有疑问，不对啊，前面不是保证一个变量在修改volatile变量时，会让缓存行无效吗？然后其他线程去读就会读到新的值，对，这个没错。这个就是上面的happens-before规则中的volatile变量规则，但是要注意，线程1对变量进行读取操作之后，被阻塞了的话，并没有对inc值进行修改。然后虽然volatile能保证线程2对变量inc的值读取是从内存中读取的，但是线程1没有进行修改，所以线程2根本就不会看到修改的值。
+
+根源就在这里，自增操作不是原子性操作，而且volatile也无法保证对变量的任何操作都是原子性的。解决的方法也就是对提供原子性的自增操作即可。
+
+在Java 1.5的java.util.concurrent.atomic包下提供了一些原子操作类，即对基本数据类型的 自增（加1操作），自减（减1操作）、以及加法操作（加一个数），减法操作（减一个数）进行了封装，保证这些操作是原子性操作。atomic是利用CAS来实现原子性操作的（Compare And Swap），CAS实际上是利用处理器提供的CMPXCHG指令实现的，而处理器执行CMPXCHG指令是一个原子性操作。
+
+Volatile与有序性
+
+在前面提到volatile关键字能禁止指令重排序，所以volatile能在一定程度上保证有序性。volatile关键字禁止指令重排序有两层意思：
+
+当程序执行到volatile变量的读操作或者写操作时，在其前面的操作的更改肯定全部已经进行，且结果已经对后面的操作可见，在其后面的操作肯定还没有进行；
+在进行指令优化时，不能将在对volatile变量访问的语句放在其后面执行，也不能把volatile变量后面的语句放到其前面执行。
+可能上面说的比较绕，举个简单的例子：
+
+//x、y为非volatile变量
+//flag为volatile变量
+x = 2;        //语句1
+y = 0;        //语句2
+flag = true;  //语句3
+x = 4;         //语句4
+y = -1;       //语句5
+由于flag变量为volatile变量，那么在进行指令重排序的过程的时候，不会将语句3放到语句1、语句2前面，也不会讲语句3放到语句4、语句5后面。但是要注意语句1和语句2的顺序、语句4和语句5的顺序是不作任何保证的。
+
+并且volatile关键字能保证，执行到语句3时，语句1和语句2必定是执行完毕了的，且语句1和语句2的执行结果对语句3、语句4、语句5是可见的。
+
+Volatile的原理和实现机制
+
+前面讲述了源于volatile关键字的一些使用，下面我们来探讨一下volatile到底如何保证可见性和禁止指令重排序的。下面这段话摘自《深入理解Java虚拟机》：
+
+观察加入volatile关键字和没有加入volatile关键字时所生成的汇编代码发现，加入volatile关键字时，会多出一个lock前缀指令
+lock前缀指令实际上相当于一个 内存屏障（也成内存栅栏），内存屏障会提供3个功能：
+
+它 确保指令重排序时不会把其后面的指令排到内存屏障之前的位置，也不会把前面的指令排到内存屏障的后面；即在执行到内存屏障这句指令时，在它前面的操作已经全部完成；
+它会 强制将对缓存的修改操作立即写入主存；
+如果是写操作，它会导致其他CPU中对应的缓存行无效。   
     
 10. transient 关键字的用法、作用及实现原理？ 
 	java 的transient关键字为我们提供了便利，你只需要实现Serilizable接口，将不需要序列化的属性前添加关键字transient，序列化对象的时候，这个属性就不会序列化到指定的目的地中。     
@@ -190,8 +377,17 @@ JAVA反射机制是在运行状态中，对于任意一个类，都能够知道�
 
 17.线程同步
 CyclicBarrier、CountDownLatch和Semaphore
-  
-##网络
+CountDownLatch：主要用于同步等待多个线程的操作完成后，再进行相关的处理。
+例如：在实际应用中比较常见的情况是，客户端需要启动三个线程，两个线程各自调用一个接口获取相关的数据，然后等待两个获取数据的线程都返回数据后，第三个线程来对数据进行处理。    
+CountDownLatch.await()等待指定线程数完成后,再执行后面的操作；CountDownLatch.countdown()表明当前线程已完成; 
+      
+CyclicBarieer：它允许某一组线程在达到栅栏点（指定的线程数）前，互相等待，发生阻塞，直到最后一个线程到达栅栏点，栅栏才会打开，然后继续执行后面的操作。    
+例如：斗地主需要三个人凑齐才会开始，在三个人都点击开始后，游戏才能开始玩，否则等待开始，或者超时离开。     
+CyclicBarieer.await();等待所有线程到达指定线程数，然后在执行后面的代码。   
+   
+semaphore：这个类是用作访问并发控制，可以设置资源最大同时访问的个数。semaphore.acquire获取到许可证，使用完后调用semaphore.release释放。
+   
+##网络   
 1.三次握手
 第一次握手：建立连接时，客户端发送syn包（syn=j）到服务器，并进入SYN_SENT状态，等待服务器确认；SYN：同步序列编号（Synchronize Sequence Numbers）。
 第二次握手：服务器收到syn包，必须确认客户的SYN（ack=j+1），同时自己也发送一个SYN包（syn=k），即SYN+ACK包，此时服务器进入SYN_RECV状态；
@@ -232,6 +428,9 @@ DELETE 请求服务器删除指定的页面。
 发出请求文档
 发出响应文档
 释放tcp连接
+    
+6.(ThreadLocal)[https://www.jianshu.com/p/377bb840802f]
+
    
 ## JVM
  
@@ -261,7 +460,8 @@ DELETE 请求服务器删除指定的页面。
    
 6. [强引用、软引用、弱引用、虚引用之间的区别？](https://github.com/jeanboydev/Android-Interview/blob/master/Java.md#java_53)
 7. 强引用设置为 null，会不会被回收？
-
+不会立即回收，等到下次gc才会被回收
+   
 8. [简述 ClassLoader 类加载机制?](https://blog.csdn.net/m0_38075425/article/details/81627349)     
 	当程序主动使用某个类时，如果该类还未被加载到内存中，则JVM会通过加载、连接、初始化3个步骤来对该类进行初始化。    
    
@@ -282,50 +482,143 @@ DELETE 请求服务器删除指定的页面。
 ## 基础
 
 1. 四大组件是什么？
-
+Activity, Services, BroadcastReaciever
+  
 2. Activity 的生命周期？
-
+onCreat, onStart, onRestart, onResume, onPause, onStop, onDestroy
+   
 3. Activity 之间的通信方式？
-
+Intent, SharedPreference, sqlite, file, BroadcastReciever, 静态变量，全局变量，eventbus,
+   
 4. Activity 各种情况下的生命周期？
 
 5. 横竖屏切换时 Activity 的生命周期
+未在AndroidManifest中配置configChangesconfigChanges：，onPause, onStop, onDestory, onCreate, onStart, onResume,
+另外还有在活动销毁和重建的时候还会分别调用: onSaveInstanceState() 和 onRestoreInstanceState() 来保存和恢复数据。
+配置configChanges后：onConfigurationChanged
 
 6. 前台切换到后台，然后再回到前台时 Activity 的生命周期
-
+A调用 onCreate() 方法 -> onStart() 方法 -> onResume() 方法，此时 A 前台可见。当 A 跳转到 B 时，A 调用 onPause() 方法，然后调用新的 Activity B 中的 onCreate() 方法 -> onStart() 方法 -> onResume() 方法。最后 A 再调用onStop()方法。当 A 再次回到时前台，B 调用 onPause() 方法，A 调用 onRestart() -> onStart() -> onResume() 方法，然后 B 再调用 onStop() -> onDestroy()方法。
+    
 7. 弹出 Dialog 的时候按 Home 键时 Activity 的生命周期
-
+有 Dialog 和 无 Dialog 按 Home 键效果一样：
+onPause,onStop,onRestart,onStart,onResume
+   
 8. 两个 Activity 之间跳转时的生命周期
-
+启动secondeActivity:first.onPause, second.onCreate, second.onStart, seconde.onResume, first.onStop
+推出secondeActivity：seconde.pause, first.onRestart,first.onStart, first.onResume, seoncd.onStop, second.onDestroy
+   
 9. 下拉状态栏时 Activity 的生命周期
+不影响activity的生命周期
+    
+10. (Activity 与 Fragment 之间生命周期比较？)[https://blog.csdn.net/u012702547/article/details/50253955]
+我们按照 Activity 的生命周期为导向，来分析:
+a. 在创建的过程中，是 Activity 带领 Fragment 执行生命周期的方法，所以它们生命周期执行的顺序如下:
+1. Activity -- onCreate() 
+2. Fragment -- onAttach() -> onCreate() -> onCreateView() -> onActivityCreated
 
-10. Activity 与 Fragment 之间生命周期比较？
+b. 接下来:
+3. Activity -- onStart() 
+4. Fragment -- onStart()
 
+c. 再接下来:
+5. Activity -- onResume()
+6. Fragment -- onResume()
+
+d. 最后，在销毁时是 Fragment 带领 Activity 执行生命周期的方法:
+7. Fragment -- onPause()
+8. Activity -- onPause()
+9. Fragment -- onStop()
+10. Activity -- onStop()
+11. Fragment -- onDestroyView() -> onDestroy() -> onDetach()
+12. Activity -- onDestroy()
+
+   
 11. Activity 的四种 LaunchMode（启动模式）的区别？
+Activity四种启动模式: standard(标准模式)、singleTop(栈顶复用模式)、singleTask(栈内复用模式)、singleInstance(单实例模式)。Android 中默认启动模式为 standard，我们可以通过在 AndroidManifest.xml 的 activity 标签下通过 launchMode 属性指定我们想要设置的启动模式。
 
+standard(标准模式)
+    标准模式，系统默认模式。每次启动一个 Activity 都会重新创建一个新的实例，不管这个实例是否已经存在。这是一种典型的多实例实现，一个任务栈中可以有多个实例，每个实例也可以属于不同的任务栈。在这种模式下，谁启动了这个 Activity，那么这个 Activity 就运行在启动它的那个 Activity 所在栈中。
+
+singleTop(栈顶复用模式)
+    栈顶复用模式。在这种模式下，如果新 Activity 已经位于任务栈的栈顶，那么此 Activity 不会被重新创建，同时它的 onNewIntent 方法会被回调，通过此方法的参数我们可以取出当前请求的信息。如果新 Activity 的实例已存在但不是位于栈顶，那么新 Activity 仍然会重新创建。
+
+singleTask(栈内复用模式)
+    栈内复用模式。这是一种单实例模式，在这种模式下，只要 Activity 在一个栈中存在，那么多次启动此 Activity 都不会重新创建实例，和 singleTop 模式一样，系统也会回调其 onNewIntent。
+    注意，这里我们分 3 种情况来理解这个 launchMode:
+    1. 被启动的 Activity 任务栈不存在:
+        此时会新建一个该 Activity 的任务栈，并将 Activity 实例放到任务栈中。
+    2. 被启动的 Activity 任务栈存在，但是任务栈中该 Activity 实例不处于栈顶而在栈内:
+        此时会先将该 Activity 实例上面的其它 Activity 实例全部出栈(因为该启动模式默认具有 clearTop 效果)并将要启动的 Activity 实例置于栈顶，系统调用其 onNewIntent 方法。
+    3. 被启动的 Activity 存在任务栈，而且该 Activity 实例在该任务栈栈顶位置:
+        直接复用任务栈中的该 Activity 实例，并调用其 onNewIntent 方法。
+
+    这里我们还需要注意一个 Activity 的属性 TaskAffinity，可以翻译为任务相关性。它标识了一个 Activity 所需要的任务栈的名字，默认情况下，所有 Activity 所需的任务栈的名字为应用的包名。这个属性主要和 singleTask 启动模式或者 allowTaskReparenting 属性配对使用，在其它情况下没有意义，为这个启动的 Activity 的任务栈指定相应的名称。
+
+singleInstance(单实例模式)
+    单实例模式。这是一种加强的 singleTask 模式，它除了具有 singleTask 模式的所有特性外，还加强了一点，那就是具有此种模式的 Activity 只能单独地位于一个任务栈中。
+    
 12. Activity 状态保存与恢复？
-
-13. Fragment 各种情况下的生命周期？
-
-14. [Activity 和 Fragment 之间怎么通信， Fragment 和 Fragment 怎么通信？](https://github.com/jeanboydev/Android-Interview/blob/master/Android.md#android_base_14)
-
+当 Activity 在异常情况( 系统内存不足或者系统配置发生了改变等 )被销毁重建后， 在销毁的时候 Activity 会调用 onSaveInstanceState() 方法用于保存 Activity 相关的状态和数据，然后在重建后的 Activity 的中我们可以通过 onCreate() 或者 onRestoreInstanceState() 方法恢复数据，这里我们需要注意的是如果通过 onCreate() 方法恢复，那么得先判断它的 intent 参数 是否为空，如果在 onRestoreInstanceState() 方法恢复就不会，因为只要 onRestoreInstanceState() 方法被调用就说明一定有数据，不会为空。Google 推荐使用 onRestoreInstanceState() 方法。
+   
+13. [Fragment 各种情况下的生命周期？](https://blog.csdn.net/yz_cfm/article/details/85643141). 
+    
+14. Activity 和 Fragment 之间怎么通信， Fragment 和 Fragment 怎么通信?
+  1.接口
+  2.获取实例
+  3.广播或eventbus
+  4.静态变量或全局变量
+      
 15. Service 的生命周期？
-
+onCreate->onStartCommand->onDestory  
+onCreate->onBind->onUnBind->onDestory  
+   
 16. Service 的启动方式？
-
+startService和bindService. 
+   
 17. Service 与 IntentService 的区别?
+IntentService会单独启动一个线程运行   
+   
+18. [Service 和 Activity 之间的通信方式？]()
+  1.bindService可以通过binder进行通行，startService的可以通过intent通信
+  2.广播
+  3.eventbus
+  4.全局变量或静态变量
 
-18. [Service 和 Activity 之间的通信方式？](https://github.com/jeanboydev/Android-Interview/blob/master/Android.md#android_base_18)
-
-19. 对 ContentProvider 的理解？
-
+19. [对 ContentProvider 的理解？](https://blog.csdn.net/cbwem/article/details/89762000)
+ContentProvider用于不同的应用程序之间实现数据共享的功能，还能保证数据安全性，使用ContentProvider（内容提供器）是Android实现跨程序共享数据的标准方式。ContentProvider可以选择只对哪一部分数据进行共享，从而保证程序中的隐私数据不会有泄露的风险。
+   
 20. ContentProvider、ContentResolver、ContentObserver 之间的关系？
-
+ContentProvider：把应用程序的私有数据信息暴露给其他应用程序，让其他应用程序可以访问到这些所有数据。如果要让其他应用程序访问，需对外暴露一个URI路径。
+ContentResolver：根据URI路径对数据进行CRUD操作。
+ContentObserver：Android系统包装好的回调，当ContentProvider数据发生变化时，会执行回调中的方法。ContentResolver发送通知，ContentObserver监听通知。
+   
 21. 对 BroadcastReceiver 的了解？
 
 22. 广播的分类？使用方式和场景？
+（1）普通广播-BroadcastReceiver
 
-23. [动态广播和静态广播有什么区别？](https://github.com/jeanboydev/Android-Interview/blob/master/Android.md#android_base_23)
+通过Context.sendBroadcast发送的广播即为普通广播，发送普通广播是最常见也是使用最多的一种广播发送方式，它的特点就是当有多个BroadcastReceiver同时接收一个广播的时候，它们都是异步接收的的，换句话说就是各个BroadcastReceiver之间接收广播的时候互不干扰，互不影响，由此便可知该广播对于每个BroadcastReceiver来说，各自都无法阻止其它BroadcastReceiver的接收动作。
+
+（2）有序广播-OrderedBroadcastReceiver
+
+通过Context.sendOrderedBroadcast发送的广播即为有序广播，与普通广播的不同在于，接收者是有序接收到广播的并且可以对广播进行修改或是取消广播向下传递。系统根据接收者定义的优先级顺序决定哪个接收者先接收到它，接收者处理完后可以将结果传递给优先级低的接收者也可以停止广播使得其他优先级低的接收者无法接收到该广播。优先级通过android:priority属性定义，数值越大优先级别越高，取值范围：-1000到1000，虽然API文档介绍对sendBroadcast发送的广播无效，不过本人测试同样有效，相同优先级的接收者接收到广播的顺序随机。Android系统收到短信、接到电话后发送的广播都是有序广播，所以可以进行短信或电话的拦截，即取消广播。
+
+PS：有序广播可以在onReceive函数中通过BroadcastReceiver的abortBroadcast接口(这个接口对sendBroadcast发送广播无效)取消广播，通过接口sendOrderedBroadcast(Intent, String, BroadcastReceiver, android.os.Handler, int, String, Bundle)发送的广播即便优先级高的广播取消了广播，接口参数中指定的BroadcastReceiver依然可以在其他接收者处理完后接收到广播。通过BroadcastReceiver的getResultExtras接口获得结果的Bundle再通过Bundle的putString和getString方法修改或获取数据，可以见本文最后的实例代码举例。
+
+（3）普通粘性广播-Sticky Broadcast
+
+如果发送者发送了某个广播，而接收者在这个广播发送后才注册自己的Receiver，这时接收者便无法接收到刚才的广播，为此Android引入了StickyBroadcast，在广播发送结束后会保存刚刚发送的广播（Intent），这样当接收者注册完Receiver后就可以继续使用刚才的广播。如果在接收者注册完成前发送了多条相同Action的粘性广播，注册完成后只会收到一条该Action的广播，并且消息内容是最后一次广播内容。系统网络状态的改变发送的广播就是粘性广播。
+
+粘性广播通过Context的sendStickyBroadcast(Intent)接口发送，需要添加权限<uses-permission android:name=”android.permission.BROADCAST_STICKY”/>
+
+也可以通过Context的removeStickyBroadcast(Intent intent)接口移除缓存的粘性广播。
+
+（4）粘性有序广播-StickyOrderedBroadcast
+
+有序粘性广播其实也和有序广播的特点是差不多的，只不过添加了粘性的特点，通过Context的sendStickyOrderedBroadcast接口发送。
+     
+23. [动态广播和静态广播有什么区别？]()
 
 24. AlertDialog、popupWindow、Activity 之间的区别？
 
@@ -502,6 +795,7 @@ DELETE 请求服务器删除指定的页面。
 	3) 进程互相唤醒   
 	4) JobSheduler   
 	5）native fork一个进程，耗电   
+  	6）忽略电池优化    
 
 10. 系统启动流程是什么？
 11. 一个应用程序安装到手机上的过程发生了什么？
@@ -546,7 +840,126 @@ ActivityManagerService通过Binder进程间通信机制通知ActivityThread，
 1. 如何对 Android 应用进行性能分析以及优化?	    
 	https://blog.csdn.net/zhangbijun1230/article/details/79449725 
 	[Bitmap压缩优化](https://www.jianshu.com/p/3ac26611bc0d)     
-		1）质量压缩：bit.compress； 2）采样率压缩：options.inSampleSize；	3）缩放法压缩（martix）	4）RGB_565压缩（ARGB_8888转RGB_565） 5)createScaledBitmap    
+		1）质量压缩：bit.compress； 2）采样率压缩：options.inSampleSize；	3）缩放法压缩（martix）	4）RGB_565压缩（ARGB_8888转RGB_565） 5)createScaledBitmap
+[转载自](https://www.bookstack.cn/read/interview/android-optimize.md)
+ANR
+
+ANR全称Application Not Responding，意思就是程序未响应。
+
+出现场景
+
+主线程被IO操作（从4.0之后网络IO不允许在主线程中）阻塞。
+主线程中存在耗时的计算
+主线程中错误的操作，比如Thread.wait或者Thread.sleep等
+Android系统会监控程序的响应状况，一旦出现下面两种情况，则弹出ANR对话框
+
+应用在5秒内未响应用户的输入事件（如按键或者触摸）
+BroadcastReceiver未在10秒内完成相关的处理
+如何避免
+
+基本的思路就是将IO操作在工作线程来处理，减少其他耗时操作和错误操作
+
+使用AsyncTask处理耗时IO操作。
+使用Thread或者HandlerThread时，调用Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)设置优先级，否则仍然会降低程序响应，因为默认Thread的优先级和主线程相同。
+使用Handler处理工作线程结果，而不是使用Thread.wait()或者Thread.sleep()来阻塞主线程。
+Activity的onCreate和onResume回调中尽量避免耗时的代码
+BroadcastReceiver中onReceive代码也要尽量减少耗时，建议使用IntentService处理。
+如何改善
+
+通常100到200毫秒就会让人察觉程序反应慢，为了更加提升响应，可以使用下面的几种方法
+
+如果程序正在后台处理用户的输入，建议使用让用户得知进度，比如使用ProgressBar控件。
+程序启动时可以选择加上欢迎界面，避免让用户察觉卡顿。
+使用Systrace和TraceView找出影响响应的问题。
+如果开发机器上出现问题，我们可以通过查看/data/anr/traces.txt即可，最新的ANR信息在最开始部分。
+
+OOM
+
+在实践操作当中，可以从四个方面着手减小内存使用，首先是减小对象的内存占用，其次是内存对象的重复利用，然后是避免对象的内存泄露，最后是内存使用策略优化。
+
+减小对象的内存占用
+
+使用更加轻量级的数据结构：例如，我们可以考虑使用ArrayMap/SparseArray而不是HashMap等传统数据结构，相比起Android系统专门为移动操作系统编写的ArrayMap容器，在大多数情况下，HashMap都显示效率低下，更占内存。另外，SparseArray更加高效在于，避免了对key与value的自动装箱，并且避免了装箱后的解箱。
+
+避免使用Enum：在Android中应该尽量使用int来代替Enum，因为使用Enum会导致编译后的dex文件大小增大，并且使用Enum时，其运行时还会产生额外的内存占用。
+
+减小Bitmap对象的内存占用：
+
+inBitmap：如果设置了这个字段，Bitmap在加载数据时可以复用这个字段所指向的bitmap的内存空间。但是，内存能够复用也是有条件的。比如，在Android 4.4(API level 19)之前，只有新旧两个Bitmap的尺寸一样才能复用内存空间。Android 4.4开始只要旧 Bitmap 的尺寸大于等于新的 Bitmap 就可以复用了。
+
+inSampleSize：缩放比例，在把图片载入内存之前，我们需要先计算出一个合适的缩放比例，避免不必要的大图载入。
+
+decode format：解码格式，选择ARGB_8888 RBG_565 ARGB_4444 ALPHA_8，存在很大差异。
+
+ARGB_4444：每个像素占四位，即A=4，R=4，G=4，B=4，那么一个像素点占4+4+4+4=16位
+ARGB_8888：每个像素占四位，即A=8，R=8，G=8，B=8，那么一个像素点占8+8+8+8=32位
+RGB_565：每个像素占四位，即R=5，G=6，B=5，没有透明度，那么一个像素点占5+6+5=16位
+ALPHA_8：每个像素占四位，只有透明度，没有颜色。
+使用更小的图片：在设计给到资源图片的时候，我们需要特别留意这张图片是否存在可以压缩的空间，是否可以使用一张更小的图片。尽量使用更小的图片不仅仅可以减少内存的使用，还可以避免出现大量的InflationException。假设有一张很大的图片被XML文件直接引用，很有可能在初始化视图的时候就会因为内存不足而发生InflationException，这个问题的根本原因其实是发生了OOM。
+
+内存对象的重复使用
+
+大多数对象的复用，最终实施的方案都是利用对象池技术，要么是在编写代码的时候显式的在程序里面去创建对象池，然后处理好复用的实现逻辑，要么就是利用系统框架既有的某些复用特性达到减少对象的重复创建，从而减少内存的分配与回收。
+
+复用系统自带资源：Android系统本身内置了很多的资源，例如字符串/颜色/图片/动画/样式以及简单布局等等，这些资源都可以在应用程序中直接引用。这样做不仅仅可以减少应用程序的自身负重，减小APK的大小，另外还可以一定程度上减少内存的开销，复用性更好。但是也有必要留意Android系统的版本差异性，对那些不同系统版本上表现存在很大差异，不符合需求的情况，还是需要应用程序自身内置进去。
+
+ListView ViewHodler
+
+Bitmap对象的复用：在ListView与GridView等显示大量图片的控件里面需要使用LRU的机制来缓存处理好的Bitmap。
+
+inBitmap：使用inBitmap属性可以告知Bitmap解码器去尝试使用已经存在的内存区域，新解码的bitmap会尝试去使用之前那张bitmap在heap中所占据的pixel data内存区域，而不是去问内存重新申请一块区域来存放bitmap。
+
+使用inBitmap，在4.4之前，只能重用相同大小的bitmap的内存区域，而4.4之后你可以重用任何bitmap的内存区域，只要这块内存比将要分配内存的bitmap大就可以。这里最好的方法就是使用LRUCache来缓存bitmap，后面来了新的bitmap，可以从cache中按照api版本找到最适合重用的bitmap，来重用它的内存区域。
+新申请的bitmap与旧的bitmap必须有相同的解码格式
+避免在onDraw方法里面执行对象的创建：类似onDraw等频繁调用的方法，一定需要注意避免在这里做创建对象的操作，因为他会迅速增加内存的使用，而且很容易引起频繁的gc，甚至是内存抖动。
+
+StringBuilder：在有些时候，代码中会需要使用到大量的字符串拼接的操作，这种时候有必要考虑使用StringBuilder来替代频繁的“+”。
+
+避免内存泄漏
+
+内部类引用导致Activity的泄漏：最典型的场景是Handler导致的Activity泄漏，如果Handler中有延迟的任务或者是等待执行的任务队列过长，都有可能因为Handler继续执行而导致Activity发生泄漏。
+Activity Context被传递到其他实例中，这可能导致自身被引用而发生泄漏。
+考虑使用Application Context而不是Activity Context
+注意临时Bitmap对象的及时回收
+注意监听器的注销
+注意缓存容器中的对象泄漏：不使用的对象要将引用置空。
+注意Cursor对象是否及时关闭
+内存优化策略
+
+综合考虑设备内存阈值与其他因素设计合适的缓存大小
+
+onLowMemory()：Android系统提供了一些回调来通知当前应用的内存使用情况，通常来说，当所有的background应用都被kill掉的时候，forground应用会收到onLowMemory()的回调。在这种情况下，需要尽快释放当前应用的非必须的内存资源，从而确保系统能够继续稳定运行。
+
+onTrimMemory()：Android系统从4.0开始还提供了onTrimMemory()的回调，当系统内存达到某些条件的时候，所有正在运行的应用都会收到这个回调，同时在这个回调里面会传递以下的参数，代表不同的内存使用情况，收到onTrimMemory()回调的时候，需要根据传递的参数类型进行判断，合理的选择释放自身的一些内存占用，一方面可以提高系统的整体运行流畅度，另外也可以避免自己被系统判断为优先需要杀掉的应用
+
+资源文件需要选择合适的文件夹进行存放：例如我们只在hdpi的目录下放置了一张100100的图片，那么根据换算关系，xxhdpi的手机去引用那张图片就会被拉伸到200200。需要注意到在这种情况下，内存占用是会显著提高的。对于不希望被拉伸的图片，需要放到assets或者nodpi的目录下。
+
+谨慎使用static对象
+
+优化布局层次，减少内存消耗
+
+使用FlatBuffer等工具序列化数据
+
+谨慎使用依赖注入框架
+
+使用ProGuard来剔除不需要的代码
+
+卡顿优化
+
+导致Android界面滑动卡顿主要有两个原因：
+
+UI线程（main）有耗时操作
+
+视图渲染时间过长，导致卡顿
+
+众所周知，界面的流畅度主要依赖FPS这个值，这个值是通过（1s/渲染1帧所花费的时间）计算所得，FPS值越大视频越流畅，所以就需要渲染1帧的时间能尽量缩短。正常流畅度的FPS值在60左右，即渲染一帧的时间不应大于16 ms。
+
+如果想让应用流畅运行 ：
+
+不要阻塞UI线程；
+不要在UI线程之外操作UI；
+减少UI嵌套层级
+针对界面切换卡顿，一般出现在组件初始化的地方。屏幕滑动卡顿，ui嵌套层级，还有图片加载，图片的话，滑动不加载，监听scrollListener。
 
 2. ANR 产生的原因是什么？怎么定位？
 	产生原因：keyinput 5秒内没有响应，broadcastreceiver 10秒内无响应，service 20秒内无响应，将会发生ANR。   
@@ -566,7 +979,8 @@ ActivityManagerService通过Binder进程间通信机制通知ActivityThread，
 8. Java 多线程引发的性能问题，怎么解决？
 
 9. 启动页白屏、黑屏、太慢怎么解决？
-
+给theme设置一个背景图片
+   
 10. App 启动崩溃异常怎么捕捉？
 
     对于 Android App 闪退，可能有哪些原因？请针对每种情况简述分析过程。【猎豹移动】
@@ -581,6 +995,19 @@ ActivityManagerService通过Binder进程间通信机制通知ActivityThread，
 
 15. 如何统计启动时长？
 
+16.Binder机制
+主要的流程是这样的：
+服务端通过Binder驱动在ServiceManager中注册我们的服务。
+客户端通过Binder驱动查询在ServiceManager中注册的服务。
+ServiceManager通过Binder驱动返回服务端的代理对象。
+客户端拿到服务端的代理对象后即可进行进程间通信。
+   Server创建了Binder实体，为其取一个字符形式，可读易记的名字。
+将这个Binder连同名字以数据包的形式通过Binder驱动发送给ServiceManager，通知ServiceManager注册一个名字为XX的Binder，它位于Server中。
+驱动为这个穿过进程边界的Binder创建位于内核中的实体结点以及ServiceManager对实体的引用，将名字以及新建的引用打包给ServiceManager。
+ServiceManager收数据包后，从中取出名字和引用填入一张查找表中。但是一个Server若向ServiceManager注册自己Binder就必须通过这个引用和ServiceManager的Binder通信。
+Server向ServiceManager注册了Binder实体及其名字后，Client就可以通过名字获得该Binder的引用了。Clent也利用保留的引用向ServiceManager请求访问某个Binder：我申请名字叫XX的Binder的引用。
+ServiceManager收到这个连接请求，从请求数据包里获得Binder的名字，在查找表里找到该名字对应的条目，从条目中取出Binder引用，将该引用作为回复发送给发起请求的Client。
+   
 ##  Gradle
 
 1. Glide 源码解析
@@ -818,3 +1245,7 @@ ActivityManagerService通过Binder进程间通信机制通知ActivityThread，
 - 我们 xx 总不在，会叫 hr 联系你，你先回去等通知
 - 面试叫你带上以往作品（工作成绩需要以往作品展示的除外，如：ui）然后面试官一直问你方案是怎么做的
 - 遇到面试官敷衍随便问问题
+
+https://gitchat.csdn.net/activity/5c6cf6044bb44360f3370255?utm_source=blog190625
+https://www.bookstack.cn/read/interview/java-threadlocal.md
+
